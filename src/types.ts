@@ -8,6 +8,7 @@ export interface Task {
 }
 
 export interface Goal {
+  color: any;
   id: string;
   title: string;
   description: string;
