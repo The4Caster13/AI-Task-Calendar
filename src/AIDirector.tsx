@@ -125,7 +125,7 @@ export default function AIDirector({ state, setState }: { state: any; setState: 
           const deadlineInput = call.input?.deadline ? String(call.input.deadline).trim() : "";
           const deadlineMs = deadlineInput ? new Date(deadlineInput).getTime() : NaN;
 
-          const palette = ["#5b4be0", "#00d4ff", "#a855f7", "#39ff14", "#f59e0b", "#ef4444"];
+          const palette = ["#BC7B6F", "#5A322A", "#718A9E", "#E4A499", "#CCCDC7"];
           const newGoal = {
             id: crypto.randomUUID(),
             title,
@@ -309,7 +309,7 @@ export default function AIDirector({ state, setState }: { state: any; setState: 
                   onClick={sendMessage}
                   disabled={isSending || !input.trim()}
                   aria-label="Send message"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-lg bg-primary flex items-center justify-center text-white disabled:opacity-40"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-lg bg-primary flex items-center justify-center text-primary-foreground disabled:opacity-40"
                 >
                   <Send size={10} />
                 </button>

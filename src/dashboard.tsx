@@ -10,14 +10,16 @@ import { Toaster } from "sonner";
 import { cn, formatDueDate } from "@/lib/utils";
 import { STAGGER_CONTAINER, FADE_UP_ITEM } from "@/lib/motion";
 import { getCompanionPace } from "@/lib/companionPace";
+import { buildProjectTimeline } from "@/lib/projectTimeline";
+import { getAllTasks, toggleTaskInState } from "@/lib/tasks";
 import {
   CampfireCompanion, CliffhangerCompanion, BuilderCompanion,
   TaskPeekCharacter, TaskJumperCharacter, TaskSmokePuffs, useTaskCompanionSequence,
 } from "@/src/mushroom-companions";
 
 const DUE_TONE_CLASSES: Record<string, string> = {
-  overdue: "bg-red-500/10 text-red-500",
-  today: "bg-amber-500/10 text-amber-500",
+  overdue: "bg-destructive/10 text-destructive",
+  today: "bg-clay/15 text-clay",
   upcoming: "bg-muted text-muted-foreground",
 };
 
@@ -59,11 +61,7 @@ export default function Dashboard({ state: globalState, setState, zenMode = fals
   // companions consider that "enough" (Settings → Companion Pace).
   const companionPace = getCompanionPace(globalState?.settings);
 
-  const allTasks = useMemo(() => (
-    goals.flatMap((g: any) => (g.tasks ?? []).map((t: any) => ({
-      ...t, projectId: g.id, projectTitle: g.title, projectColor: g.color,
-    })))
-  ), [goals]);
+  const allTasks = useMemo(() => getAllTasks(globalState), [goals, globalState?.tasks]);
 
   // Universal completion bar: every task (or project) counts equally — no
   // weighting by the task.weight field or by how many tasks a project has.
@@ -121,15 +119,8 @@ export default function Dashboard({ state: globalState, setState, zenMode = fals
       });
   }, [allTasks]);
 
-  const toggleTask = (taskId: string, projectId: string) => {
-    setState((prev: any) => ({
-      ...prev,
-      goals: prev.goals.map((g: any) => (
-        g.id === projectId
-          ? { ...g, tasks: g.tasks.map((t: any) => (t.id === taskId ? { ...t, completed: !t.completed, completedAt: !t.completed ? Date.now() : undefined } : t)) }
-          : g
-      )),
-    }));
+  const toggleTask = (taskId: string, projectId: string | null) => {
+    setState((prev: any) => toggleTaskInState(prev, taskId, projectId));
   };
 
   const completedToday = relevantTasks.filter((t: any) => t.completed).length;
@@ -144,16 +135,20 @@ export default function Dashboard({ state: globalState, setState, zenMode = fals
     const gTasks = g.tasks ?? [];
     const done = gTasks.filter((t: any) => t.completed).length;
     const total = gTasks.length;
+    const timeline = buildProjectTimeline(g);
     return {
       id: g.id,
       name: g.title,
       description: g.description,
-      progress: total > 0 ? Math.round((done / total) * 100) : 0,
+      // Weighted by each task's 1-10 weight field, not a flat per-task count —
+      // a heavier task finishing moves this more than a light one.
+      progress: timeline.progressPct,
       status: g.status ?? "active",
       deadline: g.deadline,
       tasksTotal: total,
       tasksDone: done,
-      color: g.color || "#6366f1",
+      color: g.color || "#BC7B6F",
+      timeline,
     };
   }), [goals]);
 
@@ -275,12 +270,12 @@ export default function Dashboard({ state: globalState, setState, zenMode = fals
               <h2 className="text-sm font-semibold mb-6">Weekly Activity</h2>
               <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={WEEKLY_DATA}>
-                  <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" />
-                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} width={28} allowDecimals={false} />
-                  <Tooltip cursor={{fill: 'transparent'}} contentStyle={{backgroundColor: '#111', border: 'none', borderRadius: '8px', fontSize: '10px'}} />
-                  <Bar dataKey="tasks" fill="rgba(0,212,255,0.7)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="hours" fill="rgba(57,255,20,0.5)" radius={[4, 4, 0, 0]} />
+                  <CartesianGrid vertical={false} stroke="#DDD9D0" strokeDasharray="3 3" />
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#8A6F63'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#8A6F63'}} width={28} allowDecimals={false} />
+                  <Tooltip cursor={{fill: 'transparent'}} contentStyle={{backgroundColor: '#5A322A', border: 'none', borderRadius: '8px', fontSize: '10px', color: '#FBF3EF'}} />
+                  <Bar dataKey="tasks" fill="rgba(188,123,111,0.75)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="hours" fill="rgba(113,138,158,0.55)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -294,14 +289,14 @@ export default function Dashboard({ state: globalState, setState, zenMode = fals
                 <AreaChart data={PROGRESS_DATA}>
                   <defs>
                     <linearGradient id="colorComp" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#00d4ff" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#00d4ff" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#718A9E" stopOpacity={0.35}/>
+                      <stop offset="95%" stopColor="#718A9E" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" />
-                  <XAxis dataKey="week" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} width={28} allowDecimals={false} />
-                  <Area type="monotone" dataKey="completed" stroke="#00d4ff" fill="url(#colorComp)" strokeWidth={2} dot={{r: 4, fill: '#00d4ff'}} />
+                  <CartesianGrid vertical={false} stroke="#DDD9D0" strokeDasharray="3 3" />
+                  <XAxis dataKey="week" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#8A6F63'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#8A6F63'}} width={28} allowDecimals={false} />
+                  <Area type="monotone" dataKey="completed" stroke="#718A9E" fill="url(#colorComp)" strokeWidth={2} dot={{r: 4, fill: '#718A9E'}} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -336,6 +331,7 @@ function StatCard({ label, value, sub, Icon, fill, character, iconScale = 1 }: a
 
 function ProjectCard({ project }: { project: any }) {
   const due = formatDueDate(project.deadline);
+  const timeline = project.timeline;
   return (
     <div className="p-5 rounded-2xl bg-card border border-border hover:bg-muted/10 transition-all cursor-pointer group">
       <div className="flex items-center justify-between mb-3">
@@ -355,9 +351,38 @@ function ProjectCard({ project }: { project: any }) {
         <span className="text-[10px] font-black" style={{ color: project.color }}>{project.progress}%</span>
         <span className="text-[10px] text-muted-foreground font-mono">{project.tasksDone}/{project.tasksTotal}</span>
       </div>
-      <div className="h-1 bg-muted rounded-full overflow-hidden">
-        <div className="h-full transition-all duration-1000" style={{ width: `${project.progress}%`, background: project.color }} />
+
+      {/* Timeline: solid fill shows the project's weighted completion %
+          (same number as the label above), and each task gets its own
+          milestone dot positioned at its (real or estimated) due date —
+          solid once done, hollow while pending. Dots that would land too
+          close together are nudged apart so they don't stack. */}
+      <div className="relative h-4 w-full bg-muted rounded-full overflow-hidden" title={`${project.tasksDone}/${project.tasksTotal} tasks complete`}>
+        <div
+          className="absolute top-0 left-0 h-full opacity-25 transition-all duration-1000"
+          style={{ width: `${project.progress}%`, background: project.color }}
+        />
       </div>
+      <div className="relative h-4 w-full -mt-4">
+        {timeline.tasks.map((t: any) => (
+          <div
+            key={t.id}
+            title={`${t.title} — ${t.completed ? "Done" : "Pending"}${t.estimated ? " (estimated date)" : ""}`}
+            className={cn(
+              "absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full transition-all",
+              t.completed ? "border-2 border-card" : "border-2 bg-card"
+            )}
+            style={{
+              left: `calc(${t.leftPct}% - 5px)`,
+              background: t.completed ? project.color : undefined,
+              borderColor: project.color,
+            }}
+          />
+        ))}
+      </div>
+      {timeline.range.estimated && (
+        <p className="text-[9px] text-muted-foreground font-mono mt-1.5 italic">Estimated timeline — no deadline set</p>
+      )}
     </div>
   );
 }
@@ -379,8 +404,8 @@ function TaskItem({ task, onToggle, zenMode, speed = 1 }: { task: any; onToggle:
   return (
     <div
       className={cn(
-        "mc-root mc-task-row relative w-full flex items-center gap-4 p-3.5 rounded-xl border transition-all text-left",
-        task.completed ? "bg-muted/5 border-transparent opacity-40" : "bg-card border-border hover:border-primary/30"
+        "mc-root mc-task-row relative w-full flex items-center gap-3 p-3 rounded-2xl border transition-all text-left",
+        task.completed ? "bg-muted/20 border-transparent opacity-40" : "bg-muted/50 border-border hover:border-primary/30"
       )}
       style={{ "--speed": speed } as any}
       data-mc-phase={zenMode ? "idle" : phase}
@@ -395,7 +420,7 @@ function TaskItem({ task, onToggle, zenMode, speed = 1 }: { task: any; onToggle:
       </button>
       <span className="mc-task-label-wrap flex-1 min-w-0">
         <p className={cn("text-xs font-bold truncate", task.completed && "line-through")}>{task.title}</p>
-        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-tighter mt-0.5">{task.projectTitle}</p>
+        <p className="text-[9px] font-black text-clay uppercase tracking-tighter mt-0.5">{task.projectTitle}</p>
       </span>
       {due && (
         <span className={cn("text-[9px] font-black px-2 py-1 rounded-md uppercase whitespace-nowrap shrink-0", DUE_TONE_CLASSES[due.tone])}>

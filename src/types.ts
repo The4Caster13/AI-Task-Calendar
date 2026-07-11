@@ -21,6 +21,7 @@ export interface Goal {
 
 export interface AppState {
   goals: Goal[];
+  tasks?: Task[]; // tasks not assigned to any project
   activeGoalId: string | null;
   streak: number;
   lastActiveDate: string | null; // YYYY-MM-DD
