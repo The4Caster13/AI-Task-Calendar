@@ -13,7 +13,9 @@ import {
   Menu,
   FolderDot,
   LogOut,
-  ChevronRight
+  ChevronRight,
+  Moon,
+  Sun
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -32,6 +34,8 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 
 import { Goal as Project, AppState } from './types';
 import { cn } from '@/lib/utils';
+import { TRANSITION_VIEW } from '@/lib/motion';
+import Lenis from 'lenis';
 
 // VIEW IMPORTS
 import SettingsView from '@/src/setting';
@@ -40,6 +44,7 @@ import Dashboard from '@/src/dashboard';
 import CalendarView from '@/src/calendar';
 import ProjectView from '@/src/ProjectView';
 import AIDirector from '@/src/AIDirector';
+import MushroomSprite from '@/src/mushroom-sprite';
 
 const uuid = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID
@@ -98,6 +103,8 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgot' | 'reset'>('login');
+  const [resetCode, setResetCode] = useState('');
   const [state, setState] = useState<AppState>(INITIAL_STATE);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -105,6 +112,11 @@ export default function App() {
   const [currentView, setCurrentView] = useState<string>('dashboard');
   const [newProjectTitle, setNewProjectTitle] = useState('');
   const [newProjectDesc, setNewProjectDesc] = useState('');
+  const [zenMode, setZenMode] = useState(() => localStorage.getItem('zen-mode') === 'true');
+
+  useEffect(() => {
+    localStorage.setItem('zen-mode', String(zenMode));
+  }, [zenMode]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
@@ -137,6 +149,28 @@ export default function App() {
     return () => clearTimeout(saveTimeout);
   }, [state, isLoaded, session]);
 
+  // Buttery momentum scroll on the main content area, once it's actually mounted.
+  useEffect(() => {
+    if (!isLoaded || !session?.user) return;
+    const wrapper = document.querySelector<HTMLElement>('.dashboard-scroll-area [data-slot="scroll-area-viewport"]');
+    if (!wrapper) return;
+    const content = wrapper.firstElementChild as HTMLElement | null;
+    if (!content) return;
+
+    const lenis = new Lenis({ wrapper, content, duration: 1.1, smoothWheel: true });
+    let frameId: number;
+    const raf = (time: number) => {
+      lenis.raf(time);
+      frameId = requestAnimationFrame(raf);
+    };
+    frameId = requestAnimationFrame(raf);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      lenis.destroy();
+    };
+  }, [isLoaded, session]);
+
   const handleCreateProject = () => {
     if (!newProjectTitle.trim()) return;
     const newProject: Project = {
@@ -161,16 +195,84 @@ export default function App() {
   if (!session) {
     const handleEmailAuth = async (e: React.FormEvent) => {
       e.preventDefault();
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) alert(error.message);
+      if (authMode === 'signup') {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) { alert(error.message); return; }
+        if (!data.session) alert('Account created! Check your email to confirm your address, then log in.');
+      } else if (authMode === 'forgot') {
+        const { error } = await supabase.auth.resetPasswordForEmail(email);
+        if (error) { alert(error.message); return; }
+        alert('Check your email for a verification code.');
+        setPassword('');
+        setAuthMode('reset');
+      } else if (authMode === 'reset') {
+        const { error: verifyError } = await supabase.auth.verifyOtp({ email, token: resetCode, type: 'recovery' });
+        if (verifyError) { alert(verifyError.message); return; }
+        const { error: updateError } = await supabase.auth.updateUser({ password });
+        if (updateError) { alert(updateError.message); return; }
+        alert('Password updated! You are now logged in.');
+        setResetCode('');
+        setPassword('');
+        setAuthMode('login');
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) alert(error.message);
+      }
     };
     return (
       <div className="flex items-center justify-center h-screen bg-[#F8F9FA]">
         <form onSubmit={handleEmailAuth} className="w-full max-w-sm p-8 bg-white rounded-3xl shadow-xl space-y-4">
           <h1 className="text-2xl font-black text-center">TrueProgress</h1>
-          <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          <Button type="submit" className="w-full bg-black">Log In</Button>
+
+          {authMode !== 'reset' && (
+            <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          )}
+
+          {authMode === 'reset' && (
+            <Input type="text" placeholder="Verification code" value={resetCode} onChange={(e) => setResetCode(e.target.value)} required />
+          )}
+
+          {authMode !== 'forgot' && (
+            <Input
+              type="password"
+              placeholder={authMode === 'reset' ? 'New password' : 'Password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+            />
+          )}
+
+          <Button type="submit" className="w-full bg-black">
+            {authMode === 'signup' ? 'Sign Up' : authMode === 'forgot' ? 'Send Code' : authMode === 'reset' ? 'Reset Password' : 'Log In'}
+          </Button>
+
+          {authMode === 'login' && (
+            <div className="space-y-2">
+              <button type="button" onClick={() => setAuthMode('signup')} className="w-full text-center text-sm text-gray-500 hover:text-black">
+                Don't have an account? Sign Up
+              </button>
+              <button type="button" onClick={() => setAuthMode('forgot')} className="w-full text-center text-sm text-gray-500 hover:text-black">
+                Forgot password?
+              </button>
+            </div>
+          )}
+
+          {authMode === 'signup' && (
+            <button type="button" onClick={() => setAuthMode('login')} className="w-full text-center text-sm text-gray-500 hover:text-black">
+              Already have an account? Log In
+            </button>
+          )}
+
+          {(authMode === 'forgot' || authMode === 'reset') && (
+            <button
+              type="button"
+              onClick={() => { setAuthMode('login'); setResetCode(''); setPassword(''); }}
+              className="w-full text-center text-sm text-gray-500 hover:text-black"
+            >
+              Back to Log In
+            </button>
+          )}
         </form>
       </div>
     );
@@ -184,6 +286,7 @@ export default function App() {
 
   return (
     <TooltipProvider>
+      <MushroomSprite />
       <div className="flex h-screen bg-[#F8F9FA] text-[#1A1C1E] font-sans overflow-hidden">
         {/* Sidebar (Rail Logic Applied Here) */}
         <motion.aside
@@ -251,10 +354,54 @@ export default function App() {
             </div>
           </ScrollArea>
 
-          <div className="p-4 border-t">
-            <Button 
-              variant="ghost" 
-              onClick={() => supabase.auth.signOut()} 
+          <div className="p-4 border-t space-y-1">
+            {isSidebarOpen ? (
+              <div className="relative w-full h-10 rounded-full bg-indigo-600 p-1 flex">
+                <button
+                  type="button"
+                  onClick={() => setZenMode(false)}
+                  className="relative flex-1 flex items-center justify-center gap-1.5 text-xs font-bold rounded-full"
+                >
+                  {!zenMode && (
+                    <motion.div
+                      layoutId="zen-toggle-pill"
+                      className="absolute inset-0 bg-white rounded-full shadow-sm"
+                      transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                    />
+                  )}
+                  <span className={cn("relative z-10 flex items-center gap-1.5", !zenMode ? "text-indigo-600" : "text-white/90")}>
+                    <Moon className="w-3.5 h-3.5" /> Off
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZenMode(true)}
+                  className="relative flex-1 flex items-center justify-center gap-1.5 text-xs font-bold rounded-full"
+                >
+                  {zenMode && (
+                    <motion.div
+                      layoutId="zen-toggle-pill"
+                      className="absolute inset-0 bg-white rounded-full shadow-sm"
+                      transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                    />
+                  )}
+                  <span className={cn("relative z-10 flex items-center gap-1.5", zenMode ? "text-indigo-600" : "text-white/90")}>
+                    <Sun className="w-3.5 h-3.5" /> On
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                onClick={() => setZenMode((z) => !z)}
+                className={cn("w-full justify-center transition-all", zenMode ? "text-indigo-600" : "text-gray-500 hover:text-gray-800")}
+              >
+                {zenMode ? <Sun className="w-5 h-5 shrink-0" /> : <Moon className="w-5 h-5 shrink-0" />}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              onClick={() => supabase.auth.signOut()}
               className={cn("w-full text-gray-500 hover:text-red-500 transition-all", isSidebarOpen ? "justify-start" : "justify-center")}
             >
               <LogOut className="w-5 h-5 shrink-0" />
@@ -286,16 +433,29 @@ export default function App() {
             </div>
           </header>
 
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 dashboard-scroll-area">
             <div className="w-full">
               <AnimatePresence mode="wait">
                 {(() => {
-                  if (currentView === 'dashboard') return <Dashboard key="dashboard" state={state} setState={setState} />;
-                  if (currentView === 'daily') return <DailyTasks key="daily" state={state} setState={setState} />;
-                  if (currentView === 'calendar') return <CalendarView key="calendar" state={state} setState={setState} />;
-                  if (currentView === 'settings') return <SettingsView key="settings" state={state} setState={setState} />;
-                  if (activeProject) return <ProjectView key={activeProject.id} state={state} projectId={currentView} />;
-                  return <div className="p-20 text-center text-gray-400">Page not found</div>;
+                  const view = (() => {
+                    if (currentView === 'dashboard') return <Dashboard state={state} setState={setState} zenMode={zenMode} />;
+                    if (currentView === 'daily') return <DailyTasks state={state} setState={setState} />;
+                    if (currentView === 'calendar') return <CalendarView state={state} setState={setState} />;
+                    if (currentView === 'settings') return <SettingsView state={state} setState={setState} />;
+                    if (activeProject) return <ProjectView state={state} setState={setState} projectId={currentView} />;
+                    return <div className="p-20 text-center text-gray-400">Page not found</div>;
+                  })();
+                  return (
+                    <motion.div
+                      key={activeProject ? activeProject.id : currentView}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={TRANSITION_VIEW}
+                    >
+                      {view}
+                    </motion.div>
+                  );
                 })()}
               </AnimatePresence>
             </div>

@@ -1,12 +1,19 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import {
-  CheckSquare, Flame, FolderOpen, Target, Check
+  CheckSquare, FolderOpen, Target, Check
 } from "lucide-react";
 import {
-  BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, AreaChart, Area,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area,
 } from "recharts";
 import { Toaster } from "sonner";
 import { cn, formatDueDate } from "@/lib/utils";
+import { STAGGER_CONTAINER, FADE_UP_ITEM } from "@/lib/motion";
+import { getCompanionPace } from "@/lib/companionPace";
+import {
+  CampfireCompanion, CliffhangerCompanion, BuilderCompanion,
+  TaskPeekCharacter, TaskJumperCharacter, TaskSmokePuffs, useTaskCompanionSequence,
+} from "@/src/mushroom-companions";
 
 const DUE_TONE_CLASSES: Record<string, string> = {
   overdue: "bg-red-500/10 text-red-500",
@@ -28,16 +35,75 @@ const PROGRESS_DATA = [
   { week: "W5", completed: 47 }, { week: "W6", completed: 58 },
 ];
 
+type CompletionModeId = "today" | "week" | "month" | "projects" | "all";
+
+const COMPLETION_TABS: { id: CompletionModeId; label: string }[] = [
+  { id: "today", label: "Due Today" },
+  { id: "week", label: "Due This Week" },
+  { id: "month", label: "Due This Month" },
+  { id: "projects", label: "Projects" },
+  { id: "all", label: "All Tasks" },
+];
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export default function Dashboard({ state: globalState, setState }: { state: any; setState: any }) {
+export default function Dashboard({ state: globalState, setState, zenMode = false, speed = 1 }: { state: any; setState: any; zenMode?: boolean; speed?: number }) {
   const goals: any[] = Array.isArray(globalState?.goals) ? globalState.goals : [];
+  const [completionMode, setCompletionMode] = useState<CompletionModeId>("today");
+  // Day Streak / Weekly Output aren't tracked from real data yet (see the
+  // hardcoded StatCard values below) — these mirror those same mock numbers
+  // so the campfire/cliff characters react to whatever the card displays.
+  const dayStreak = 14;
+  const weeklyOutputFill = 82;
+  // How much work the user wants to do in a given period — controls when the
+  // companions consider that "enough" (Settings → Companion Pace).
+  const companionPace = getCompanionPace(globalState?.settings);
 
   const allTasks = useMemo(() => (
     goals.flatMap((g: any) => (g.tasks ?? []).map((t: any) => ({
       ...t, projectId: g.id, projectTitle: g.title, projectColor: g.color,
     })))
   ), [goals]);
+
+  // Universal completion bar: every task (or project) counts equally — no
+  // weighting by the task.weight field or by how many tasks a project has.
+  // "Due Today/Week/Month" scope by due date, rolling in overdue and
+  // undated tasks (they need attention now, same as the Today's Tasks widget).
+  // "Projects" averages each project's own % equally, regardless of task count.
+  const completionBuckets = useMemo(() => {
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const dayMs = 86400000;
+
+    const dueWithin = (days: number) => {
+      const cutoff = todayStart.getTime() + days * dayMs;
+      const scoped = allTasks.filter((t: any) => !t.dueDate || t.dueDate < cutoff);
+      return { done: scoped.filter((t: any) => t.completed).length, total: scoped.length };
+    };
+
+    const projectPcts = goals
+      .map((g: any) => {
+        const gTasks = g.tasks ?? [];
+        if (gTasks.length === 0) return null;
+        return (gTasks.filter((t: any) => t.completed).length / gTasks.length) * 100;
+      })
+      .filter((p: number | null): p is number => p !== null);
+
+    return {
+      today: dueWithin(1),
+      week: dueWithin(7),
+      month: dueWithin(30),
+      all: { done: allTasks.filter((t: any) => t.completed).length, total: allTasks.length },
+      projects: {
+        pct: projectPcts.length > 0 ? Math.round(projectPcts.reduce((sum: number, p: number) => sum + p, 0) / projectPcts.length) : 0,
+        count: projectPcts.length,
+      },
+    };
+  }, [allTasks, goals]);
+
+  const activeBucket = completionBuckets[completionMode];
+  const universalPct = completionMode === "projects"
+    ? (activeBucket as { pct: number; count: number }).pct
+    : Math.round((((activeBucket as { done: number; total: number }).done / (activeBucket as { done: number; total: number }).total) * 100) || 0);
 
   // "Today's Tasks" = anything overdue, due today, undated, or completed today.
   const relevantTasks = useMemo(() => {
@@ -91,26 +157,6 @@ export default function Dashboard({ state: globalState, setState }: { state: any
     };
   }), [goals]);
 
-  // Duration awareness: for each project with a deadline, how much of its
-  // available time has elapsed vs. how much of its work is actually done.
-  const projectTimelines = useMemo(() => {
-    const now = Date.now();
-    return goals
-      .filter((g: any) => g.deadline)
-      .map((g: any) => {
-        const start = g.createdAt ?? g.deadline;
-        const span = Math.max(g.deadline - start, 1);
-        const timePct = Math.min(Math.max(((now - start) / span) * 100, 0), 100);
-        const gTasks = g.tasks ?? [];
-        const done = gTasks.filter((t: any) => t.completed).length;
-        const total = gTasks.length;
-        const taskPct = total > 0 ? (done / total) * 100 : 0;
-        const daysLeft = Math.ceil((g.deadline - now) / 86400000);
-        return { id: g.id, title: g.title, color: g.color || "#6366f1", timePct, taskPct, daysLeft, done, total };
-      })
-      .sort((a, b) => a.daysLeft - b.daysLeft);
-  }, [goals]);
-
   return (
     <div className="w-full bg-transparent text-foreground">
       <Toaster theme="dark" position="top-center" />
@@ -118,12 +164,63 @@ export default function Dashboard({ state: globalState, setState }: { state: any
       {/* MAIN CONTENT AREA (Removed aside, header, and ScrollArea because App.js provides them) */}
       <div className="max-w-[1200px] mx-auto p-8 space-y-8 pb-32">
 
-          {/* Stats Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Universal Completion Bar — the app's central metric. No card box:
+              sits directly on the page so it reads as the dashboard's spine,
+              not another widget in the card grid. */}
+          <div className="space-y-5 pb-6 border-b border-border">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <h2 className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-1">Overall Completion</h2>
+                <p className="text-5xl font-black tracking-tighter text-foreground leading-none">
+                  {universalPct}<span className="text-2xl text-muted-foreground">%</span>
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {COMPLETION_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setCompletionMode(tab.id)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all border",
+                      completionMode === tab.id
+                        ? "bg-primary text-primary-foreground border-transparent"
+                        : "text-muted-foreground border-border hover:border-primary/30"
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="relative h-5 w-full bg-muted rounded-full overflow-hidden">
+              <div
+                className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-700"
+                style={{ width: `${universalPct}%` }}
+              />
+            </div>
+            <p className="text-[10px] font-mono text-muted-foreground">
+              {completionMode === "projects"
+                ? `${(activeBucket as { pct: number; count: number }).count} project${(activeBucket as { pct: number; count: number }).count === 1 ? "" : "s"} tracked`
+                : `${(activeBucket as { done: number; total: number }).done}/${(activeBucket as { done: number; total: number }).total} tasks`}
+            </p>
+          </div>
+
+          {/* Stats Row — extra top padding gives the edge-anchored companions
+              (builder, cliff-hanger) room to poke up above their cards. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-14">
             <StatCard label="TASKS TODAY" value={`${completedToday}/${totalToday}`} sub={`${completionPct}% complete`} Icon={CheckSquare} fill={completionPct} />
-            <StatCard label="ACTIVE PROJECTS" value={String(activeCount)} sub={`${pausedCount} paused`} Icon={FolderOpen} fill={activePct} />
-            <StatCard label="DAY STREAK" value="14" sub="+2 vs last week" Icon={Flame} fill={93} />
-            <StatCard label="WEEKLY OUTPUT" value="58 tasks" sub="7h 12m avg/day" Icon={Target} fill={82} />
+            <StatCard
+              label="ACTIVE PROJECTS" value={String(activeCount)} sub={`${pausedCount} paused`} Icon={FolderOpen} fill={activePct}
+              character={<BuilderCompanion zenMode={zenMode} speed={speed} />}
+            />
+            <StatCard
+              label="DAY STREAK" value="14" sub="+2 vs last week" fill={93}
+              character={<CampfireCompanion streakDays={dayStreak} streakGoalDays={companionPace.streakGoalDays} zenMode={zenMode} speed={speed} />}
+            />
+            <StatCard
+              label="WEEKLY OUTPUT" value="58 tasks" sub="7h 12m avg/day" Icon={Target} fill={weeklyOutputFill}
+              character={<CliffhangerCompanion isHighOutput={weeklyOutputFill >= companionPace.weeklyOutputGoalPct} zenMode={zenMode} speed={speed} />}
+            />
           </div>
 
           {/* Content Grid: Projects & Tasks */}
@@ -137,9 +234,18 @@ export default function Dashboard({ state: globalState, setState }: { state: any
               {projectCards.length === 0 ? (
                 <p className="text-xs text-muted-foreground italic py-4 text-center">No projects yet.</p>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {projectCards.map((p) => <ProjectCard key={p.id} project={p} />)}
-                </div>
+                <motion.div
+                  className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                  variants={STAGGER_CONTAINER}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  {projectCards.map((p) => (
+                    <motion.div key={p.id} variants={FADE_UP_ITEM}>
+                      <ProjectCard project={p} />
+                    </motion.div>
+                  ))}
+                </motion.div>
               )}
             </div>
 
@@ -149,52 +255,17 @@ export default function Dashboard({ state: globalState, setState }: { state: any
                 <h2 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Today's Tasks</h2>
                 <span className="text-[10px] font-mono text-muted-foreground">{completedToday} DONE</span>
               </div>
-              <div className="space-y-2">
+              <motion.div className="space-y-2" variants={STAGGER_CONTAINER} initial="hidden" animate="visible">
                 {relevantTasks.length === 0 ? (
                   <p className="text-xs text-muted-foreground italic py-4 text-center">Nothing due today. ✓</p>
                 ) : (
                   relevantTasks.map((t: any) => (
-                    <TaskItem key={t.id} task={t} onToggle={() => toggleTask(t.id, t.projectId)} />
+                    <motion.div key={t.id} variants={FADE_UP_ITEM}>
+                      <TaskItem task={t} onToggle={() => toggleTask(t.id, t.projectId)} zenMode={zenMode} speed={speed} />
+                    </motion.div>
                   ))
                 )}
-              </div>
-            </div>
-          </div>
-
-          {/* Project Timelines: elapsed time vs. actual completion, per deadline */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Project Timelines</h2>
-              <span className="text-[10px] font-mono text-muted-foreground">TIME ELAPSED VS. DONE</span>
-            </div>
-            <div className="p-6 rounded-2xl bg-card border border-border space-y-5">
-              {projectTimelines.length === 0 ? (
-                <p className="text-xs text-muted-foreground italic py-2 text-center">No project deadlines set yet.</p>
-              ) : (
-                projectTimelines.map((p) => (
-                  <div key={p.id}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold">{p.title}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-mono text-muted-foreground">{p.done}/{p.total} tasks</span>
-                        <span className={cn("text-[10px] font-black uppercase", p.daysLeft < 0 ? "text-destructive" : "text-muted-foreground")}>
-                          {p.daysLeft < 0 ? `${Math.abs(p.daysLeft)}d overdue` : p.daysLeft === 0 ? "Due today" : `${p.daysLeft}d left`}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="relative h-2.5 w-full bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="absolute top-0 left-0 h-full rounded-full opacity-30 transition-all duration-1000"
-                        style={{ width: `${p.timePct}%`, background: p.color }}
-                      />
-                      <div
-                        className="absolute top-0 left-0 h-full rounded-full transition-all duration-700"
-                        style={{ width: `${p.taskPct}%`, background: p.color }}
-                      />
-                    </div>
-                  </div>
-                ))
-              )}
+              </motion.div>
             </div>
           </div>
 
@@ -204,7 +275,9 @@ export default function Dashboard({ state: globalState, setState }: { state: any
               <h2 className="text-sm font-semibold mb-6">Weekly Activity</h2>
               <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={WEEKLY_DATA}>
+                  <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" />
                   <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} width={28} allowDecimals={false} />
                   <Tooltip cursor={{fill: 'transparent'}} contentStyle={{backgroundColor: '#111', border: 'none', borderRadius: '8px', fontSize: '10px'}} />
                   <Bar dataKey="tasks" fill="rgba(0,212,255,0.7)" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="hours" fill="rgba(57,255,20,0.5)" radius={[4, 4, 0, 0]} />
@@ -225,7 +298,9 @@ export default function Dashboard({ state: globalState, setState }: { state: any
                       <stop offset="95%" stopColor="#00d4ff" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="week" hide />
+                  <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" />
+                  <XAxis dataKey="week" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} width={28} allowDecimals={false} />
                   <Area type="monotone" dataKey="completed" stroke="#00d4ff" fill="url(#colorComp)" strokeWidth={2} dot={{r: 4, fill: '#00d4ff'}} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -238,18 +313,23 @@ export default function Dashboard({ state: globalState, setState }: { state: any
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function StatCard({ label, value, sub, Icon, fill }: any) {
+function StatCard({ label, value, sub, Icon, fill, character, iconScale = 1 }: any) {
   return (
-    <div className="p-5 rounded-2xl bg-card border border-border hover:border-primary/20 transition-all group">
+    <div className="relative overflow-visible p-5 rounded-2xl bg-card border border-border hover:border-primary/20 transition-all group">
       <div className="flex justify-between items-start mb-4">
         <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{label}</span>
-        <Icon className="w-4 h-4 text-primary opacity-70" />
+        {Icon && (
+          <motion.div animate={{ scale: iconScale }} transition={{ duration: 0.5, ease: "easeOut" }}>
+            <Icon className="w-4 h-4 text-primary opacity-70" />
+          </motion.div>
+        )}
       </div>
       <p className="text-3xl font-black mb-1 tracking-tighter">{value}</p>
       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter mb-4">{sub}</p>
       <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
         <div className="h-full bg-primary transition-all duration-1000" style={{ width: `${fill}%` }} />
       </div>
+      {character}
     </div>
   );
 }
@@ -282,25 +362,52 @@ function ProjectCard({ project }: { project: any }) {
   );
 }
 
-function TaskItem({ task, onToggle }: { task: any; onToggle: () => void }) {
+function TaskItem({ task, onToggle, zenMode, speed = 1 }: { task: any; onToggle: () => void; zenMode: boolean; speed?: number }) {
   const due = formatDueDate(task.dueDate);
+  const { phase, trigger, reset } = useTaskCompanionSequence(!!task.completed, onToggle, speed);
+
+  const handleBoxClick = (e: any) => {
+    e.stopPropagation();
+    if (task.completed) {
+      reset();
+      onToggle();
+    } else {
+      trigger();
+    }
+  };
+
   return (
-    <button onClick={onToggle} className={cn(
-      "w-full flex items-center gap-4 p-3.5 rounded-xl border transition-all text-left",
-      task.completed ? "bg-muted/5 border-transparent opacity-40" : "bg-card border-border hover:border-primary/30"
-    )}>
-      <div className={cn("w-5 h-5 rounded-md border flex items-center justify-center shrink-0", task.completed ? "bg-primary border-primary" : "border-border")}>
+    <div
+      className={cn(
+        "mc-root mc-task-row relative w-full flex items-center gap-4 p-3.5 rounded-xl border transition-all text-left",
+        task.completed ? "bg-muted/5 border-transparent opacity-40" : "bg-card border-border hover:border-primary/30"
+      )}
+      style={{ "--speed": speed } as any}
+      data-mc-phase={zenMode ? "idle" : phase}
+    >
+      <button
+        type="button"
+        onClick={handleBoxClick}
+        className={cn("relative w-5 h-5 rounded-md border flex items-center justify-center shrink-0", task.completed ? "bg-primary border-primary" : "border-border")}
+      >
         {task.completed && <Check size={12} className="text-primary-foreground" strokeWidth={4} />}
-      </div>
-      <div className="flex-1 min-w-0">
+        {!zenMode && <TaskPeekCharacter />}
+      </button>
+      <span className="mc-task-label-wrap flex-1 min-w-0">
         <p className={cn("text-xs font-bold truncate", task.completed && "line-through")}>{task.title}</p>
         <p className="text-[9px] font-black text-muted-foreground uppercase tracking-tighter mt-0.5">{task.projectTitle}</p>
-      </div>
+      </span>
       {due && (
         <span className={cn("text-[9px] font-black px-2 py-1 rounded-md uppercase whitespace-nowrap shrink-0", DUE_TONE_CLASSES[due.tone])}>
           {due.label}
         </span>
       )}
-    </button>
+      {!zenMode && (
+        <>
+          <TaskJumperCharacter />
+          <TaskSmokePuffs />
+        </>
+      )}
+    </div>
   );
 }

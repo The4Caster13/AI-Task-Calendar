@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus, Flag, CalendarDays,
 } from "lucide-react";
@@ -70,7 +70,6 @@ export default function Calendar({ state, setState }: { state: any; setState: an
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskProjectId, setNewTaskProjectId] = useState<string>("");
   const [newTaskPriority, setNewTaskPriority] = useState(false);
-  const wheelLockRef = useRef(false);
 
   const goals: any[] = Array.isArray(state?.goals) ? state.goals : [];
 
@@ -81,13 +80,6 @@ export default function Calendar({ state, setState }: { state: any; setState: an
     setViewDate((d) => new Date(d.getFullYear() + delta, d.getMonth(), 1));
   };
   const goToday = () => setViewDate(new Date());
-
-  const handleWheel = (e: any) => {
-    if (wheelLockRef.current || Math.abs(e.deltaY) < 12) return;
-    wheelLockRef.current = true;
-    shiftMonth(e.deltaY > 0 ? 1 : -1);
-    setTimeout(() => { wheelLockRef.current = false; }, 350);
-  };
 
   const grid = useMemo(() => buildMonthGrid(viewDate), [viewDate]);
 
@@ -203,10 +195,7 @@ export default function Calendar({ state, setState }: { state: any; setState: an
         <p className="text-gray-500 mt-1">View deadlines, add tasks, and track project timelines.</p>
       </div>
 
-      <div
-        className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6"
-        onWheel={handleWheel}
-      >
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6">
         {/* Navigation */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-1">

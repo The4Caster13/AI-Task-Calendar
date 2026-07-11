@@ -1,0 +1,121 @@
+/* ============================================================
+   Mushroom Companions — ported 1:1 from the design handoff's
+   mushroom-companions.html reference (keyframes, timings, easing).
+   Global speed multiplier: --speed, set per companion root.
+   Easing throughout: cubic-bezier(.42, 0, .58, 1)
+   ============================================================ */
+
+.mc-root { --speed: 1; }
+
+@keyframes mc-breathe   { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@keyframes mc-dip       { 0%,100% { transform: rotate(-16deg); } 55% { transform: rotate(9deg); } }
+@keyframes mc-bob       { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes mc-flicker   { 0% { transform: scale(1); } 14% { transform: scale(1.05); } 28% { transform: scale(.96); } 45% { transform: scale(1.05); } 62% { transform: scale(.97); } 80% { transform: scale(1.04); } 100% { transform: scale(1); } }
+@keyframes mc-flagwave  { 0%,100% { transform: rotate(0) skewY(0); } 33% { transform: rotate(-5deg) skewY(-8deg); } 66% { transform: rotate(4deg) skewY(6deg); } }
+@keyframes mc-chestpuff { 0%,86%,100% { transform: scale(1,1); } 90%,95% { transform: scale(.98,1.07); } }
+@keyframes mc-fallchar  { 0% { transform: translateY(-56px) rotate(0); opacity: 0; } 10% { opacity: 1; } 88% { opacity: 1; } 100% { transform: translateY(195px) rotate(340deg); opacity: 0; } }
+@keyframes mc-fallumb   { 0% { transform: translate(0,-48px) rotate(-16deg); opacity: 0; } 8% { opacity: 1; } 25% { transform: translate(18px,16px) rotate(12deg); } 50% { transform: translate(-8px,76px) rotate(-18deg); } 75% { transform: translate(16px,134px) rotate(10deg); } 90% { opacity: 1; } 100% { transform: translate(2px,200px) rotate(-6deg); opacity: 0; } }
+@keyframes mc-windline  { 0% { transform: translateX(-46px); opacity: 0; } 18% { opacity: .65; } 80% { opacity: .65; } 100% { transform: translateX(110px); opacity: 0; } }
+@keyframes mc-waddle    { 0%,100% { transform: rotate(-5deg) translateY(0); } 25% { transform: rotate(0) translateY(-2px); } 50% { transform: rotate(5deg) translateY(0); } 75% { transform: rotate(0) translateY(-2px); } }
+@keyframes mc-readnod   { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-2px) rotate(-3deg); } }
+@keyframes mc-hammertap { 0%,30%,55%,85%,100% { transform: rotate(-40deg); } 10%,16% { transform: rotate(24deg); } 65%,71% { transform: rotate(24deg); } }
+@keyframes mc-sparkflash{ 0%,8%,20%,62%,76%,100% { opacity: 0; transform: scale(.4); } 11%,16% { opacity: 1; transform: scale(1); } 66%,72% { opacity: 1; transform: scale(1); } }
+@keyframes mc-lookLR    { 0% { transform: translateX(0); } 25% { transform: translateX(-2.4px); } 62% { transform: translateX(2.4px); } 100% { transform: translateX(0); } }
+@keyframes mc-jumpX     { from { transform: translateX(0); } to { transform: translateX(96px); } }
+@keyframes mc-jumpY     { 0% { transform: translateY(0) scale(1,1); animation-timing-function: cubic-bezier(.3,0,.7,.4); }
+                          14% { transform: translateY(2px) scale(1.12,.82); animation-timing-function: cubic-bezier(.2,.6,.4,1); }
+                          58% { transform: translateY(-46px) scale(.94,1.08); animation-timing-function: cubic-bezier(.42,0,.58,1); }
+                          100% { transform: translateY(0) scale(1.18,.78); } }
+@keyframes mc-hopkf     { 0% { transform: translateY(0) scale(1,1); } 20% { transform: translateY(1px) scale(1.1,.88); } 55% { transform: translateY(-12px) scale(.96,1.05); } 100% { transform: translateY(0) scale(1,1); } }
+@keyframes mc-puff      { 0% { opacity: .95; transform: scale(.5); } 50% { opacity: .6; transform: scale(1.1); } 100% { opacity: 0; transform: scale(1.6); } }
+
+/* ---------- set 1: campfire ---------- */
+.mc-campfire-a { position: absolute; right: 8px; top: -54px; width: 132px; height: 70px; }
+.mc-roaster    { position: absolute; left: 0; bottom: 0; animation: mc-breathe calc(4s / var(--speed)) cubic-bezier(.42,0,.58,1) infinite; transform-origin: 50% 100%; }
+.mc-roaster > div { transform: rotate(5deg); }
+.mc-stick      { position: absolute; left: 32px; bottom: 28px; width: 52px; height: 12px; transform-origin: 0 50%; animation: mc-dip calc(3.2s / var(--speed)) cubic-bezier(.42,0,.58,1) infinite; }
+.mc-stick-line { position: absolute; left: 0; top: 5px; width: 46px; height: 2.5px; background: #7a5a3a; border-radius: 2px; }
+.mc-mallow     { position: absolute; right: 0; top: .5px; width: 8px; height: 8px; background: #fff8ee; border: 1px solid #ddcbb0; border-radius: 2.5px; }
+.mc-fire       { position: absolute; width: 34px; height: 36px; bottom: 0; }
+.mc-log1, .mc-log2 { position: absolute; bottom: 1px; width: 26px; height: 5px; border-radius: 3px; }
+.mc-log1       { left: 2px; background: #7a5a3a; transform: rotate(16deg); }
+.mc-log2       { left: 4px; background: #8f6b45; transform: rotate(-16deg); }
+.mc-fire svg   { position: absolute; left: 3px; bottom: 5px; }
+.mc-fire.mc-flickering svg { animation: mc-flicker calc(.85s / var(--speed)) linear infinite; transform-origin: 50% 100%; }
+.mc-campfire-b { position: absolute; right: 6px; top: -54px; width: 150px; height: 70px; }
+.mc-bobber     { position: absolute; bottom: 0; animation: mc-bob calc(.55s / var(--speed)) cubic-bezier(.42,0,.58,1) infinite; }
+.mc-mirrored   { transform: scaleX(-1); }
+
+/* ---------- set 2: cliff-hanger ---------- */
+.mc-flagbearer { position: absolute; top: -53px; right: 34px; }
+.mc-flagbearer .mc-puffer { animation: mc-chestpuff calc(5s / var(--speed)) cubic-bezier(.42,0,.58,1) infinite; transform-origin: 50% 100%; }
+.mc-flagpole   { position: absolute; left: -14px; top: 8px; width: 2.5px; height: 44px; background: #7a5c3e; border-radius: 2px; }
+.mc-flag       { position: absolute; left: -12px; top: 7px; transform-origin: 0 50%; animation: mc-flagwave calc(.6s / var(--speed)) steps(3, end) infinite; }
+.mc-freefall   { position: absolute; top: -32px; right: 10px; width: 136px; height: 186px; overflow: hidden; pointer-events: none; }
+.mc-faller     { position: absolute; left: 64px; top: 0; animation: mc-fallchar calc(3.4s / var(--speed)) linear infinite; transform-origin: 50% 50%; }
+.mc-umbrella   { position: absolute; left: 14px; top: 0; width: 40px; height: 44px; animation: mc-fallumb calc(4.8s / var(--speed)) cubic-bezier(.42,0,.58,1) infinite; transform-origin: 50% 40%; }
+.mc-umb-pole   { position: absolute; left: 17px; top: 9px; width: 2.5px; height: 32px; background: #7a5c3e; border-radius: 2px; }
+.mc-wind       { position: absolute; height: 2px; border-radius: 2px; background: #c3ae8c; animation: mc-windline calc(1.8s / var(--speed)) linear infinite; }
+
+/* ---------- set 3: builder ---------- */
+.mc-builder    { position: absolute; top: -53px; left: 0; will-change: transform; }
+.mc-builder-flip  { transform: scaleX(1); }
+[data-mc-bphase="walkR"] .mc-builder-flip { transform: scaleX(-1); }
+.mc-builder-idle  { position: relative; transform-origin: 50% 100%; }
+[data-mc-bphase="walkL"] .mc-builder-idle,
+[data-mc-bphase="walkR"] .mc-builder-idle { animation: mc-waddle calc(.5s / var(--speed)) steps(4, end) infinite; }
+[data-mc-bphase="read"]  .mc-builder-idle { animation: mc-readnod calc(1.1s / var(--speed)) cubic-bezier(.42,0,.58,1) infinite; }
+.mc-blueprint  { display: none; position: absolute; left: 28px; top: 20px; width: 17px; height: 13px; background: #f6f9fb; border: 1px solid #b9cbd8; border-radius: 2px; box-shadow: 0 1px 2px rgba(70,54,37,.15); }
+.mc-blueprint i { display: block; margin: 2px 2px 0; height: 1.5px; background: #a5c0d2; }
+.mc-blueprint i:first-child { margin-top: 2.5px; background: #7fa3bd; }
+.mc-blueprint i:nth-child(2) { width: 70%; }
+.mc-blueprint i:nth-child(3) { width: 50%; }
+[data-mc-bphase="read"] .mc-blueprint { display: block; }
+.mc-hammer     { display: none; position: absolute; left: 29px; top: 24px; width: 14px; height: 20px; transform-origin: 2px 18px; }
+.mc-hammer-handle { position: absolute; left: 0; top: 4px; width: 3px; height: 15px; background: #8f6b45; border-radius: 1.5px; transform: rotate(20deg); }
+.mc-hammer-head   { position: absolute; left: 2px; top: 0; width: 11px; height: 6px; background: #8b8f94; border-radius: 2px; transform: rotate(20deg); }
+.mc-sparkle    { display: none; position: absolute; left: 40px; top: 44px; }
+[data-mc-bphase="hammer"] .mc-hammer  { display: block; animation: mc-hammertap calc(2.2s / var(--speed)) cubic-bezier(.42,0,.58,1) 1 both; }
+[data-mc-bphase="hammer"] .mc-sparkle { display: block; animation: mc-sparkflash calc(2.2s / var(--speed)) linear 1 both; }
+
+/* ---------- set 4: task helper ---------- */
+.mc-task-row   { position: relative; }
+.mc-peek-window { position: absolute; left: -2px; top: -14px; width: 30px; height: 27px; overflow: hidden; pointer-events: none; z-index: 1; }
+.mc-peek-char  { transform: translateY(29px); transition: transform .16s cubic-bezier(.2,1.2,.4,1); }
+.mc-peek-char svg { display: block; margin: 0 auto; }
+.mc-peek-eyes  { opacity: 0; }
+.mc-task-row[data-mc-phase="idle"]:hover .mc-peek-char { transform: translateY(3px); }
+.mc-task-row[data-mc-phase="idle"]:hover .mc-peek-eyes { opacity: 1; animation: mc-lookLR calc(.7s / var(--speed)) cubic-bezier(.42,0,.58,1) .12s 1 both; }
+.mc-task-label-wrap { transition: transform .14s cubic-bezier(.42,0,.58,1); transform-origin: 0 60%; }
+.mc-task-row[data-mc-phase="squish"] .mc-task-label-wrap { transform: scaleY(.1); }
+.mc-jumper     { display: none; position: absolute; left: -2px; top: 5px; z-index: 3; pointer-events: none; }
+.mc-task-row[data-mc-phase="crouch"] .mc-jumper,
+.mc-task-row[data-mc-phase="jump"]   .mc-jumper,
+.mc-task-row[data-mc-phase="squish"] .mc-jumper,
+.mc-task-row[data-mc-phase="hop"]    .mc-jumper { display: block; }
+.mc-jumper-y   { transition: transform .15s cubic-bezier(.42,0,.58,1); transform-origin: 50% 100%; }
+.mc-task-row[data-mc-phase="crouch"] .mc-jumper-y { transform: scale(1.18,.68); }
+.mc-task-row[data-mc-phase="jump"]   .mc-jumper-x { animation: mc-jumpX calc(.56s / var(--speed)) linear 1 both; }
+.mc-task-row[data-mc-phase="jump"]   .mc-jumper-y { animation: mc-jumpY calc(.56s / var(--speed)) linear 1 both; }
+.mc-task-row[data-mc-phase="squish"] .mc-jumper-x,
+.mc-task-row[data-mc-phase="hop"]    .mc-jumper-x { transform: translateX(96px); }
+.mc-task-row[data-mc-phase="hop"]    .mc-jumper-y { animation: mc-hopkf calc(.42s / var(--speed)) cubic-bezier(.42,0,.58,1) 1 both; }
+.mc-smoke      { display: none; position: absolute; left: 100px; top: 10px; z-index: 3; pointer-events: none; }
+.mc-task-row[data-mc-phase="smoke"] .mc-smoke { display: block; }
+.mc-smoke i    { position: absolute; border-radius: 50%; animation: mc-puff calc(.45s / var(--speed)) steps(3, end) 1 both; }
+.mc-smoke i:nth-child(1) { left: 0; top: 6px; width: 14px; height: 14px; background: #d8cbb4; }
+.mc-smoke i:nth-child(2) { left: 12px; top: 0; width: 11px; height: 11px; background: #e3d8c2; }
+.mc-smoke i:nth-child(3) { left: -8px; top: 2px; width: 9px; height: 9px; background: #e3d8c2; }
+
+/* ---------- accessibility ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .mc-root, .mc-root *, .mc-root *::before, .mc-root *::after {
+    animation-duration: .01s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01s !important;
+  }
+}
+
+/* ---------- zen mode (this app's existing focus toggle, layered on top) ---------- */
+.mc-zen { opacity: .2; }
+.mc-zzz { font-size: 9px; font-weight: 900; color: #94a3b8; opacity: .5; letter-spacing: .04em; pointer-events: none; user-select: none; }

@@ -1,10 +1,13 @@
 import React from 'react';
-import { Clock, User, Settings2 } from 'lucide-react';
+import { Clock, User, Settings2, Gauge } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { COMPANION_PACE_PRESETS, getCompanionPace, type CompanionPaceId } from '@/lib/companionPace';
 
 export default function Settings({ state, setState }: { state: any, setState: any }) {
   // Use existing settings or default to 9-to-6
   const settings = state.settings || { dayStart: 9, dayEnd: 18 };
+  const companionPace = getCompanionPace(settings);
 
   const updateWorkHours = (field: 'dayStart' | 'dayEnd', value: string) => {
     const numValue = parseInt(value);
@@ -13,6 +16,16 @@ export default function Settings({ state, setState }: { state: any, setState: an
       settings: {
         ...(prev.settings || { dayStart: 9, dayEnd: 18 }),
         [field]: numValue
+      }
+    }));
+  };
+
+  const updateCompanionPace = (pace: CompanionPaceId) => {
+    setState((prev: any) => ({
+      ...prev,
+      settings: {
+        ...(prev.settings || { dayStart: 9, dayEnd: 18 }),
+        companionPace: pace,
       }
     }));
   };
@@ -74,6 +87,44 @@ export default function Settings({ state, setState }: { state: any, setState: an
                 ))}
               </select>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Companion Pace Section */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex items-center gap-2">
+          <Gauge className="w-4 h-4 text-indigo-600" />
+          <h3 className="text-sm font-bold text-slate-800">Companion Pace</h3>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <p className="text-xs text-slate-500 font-medium leading-relaxed">
+            How much work you want to do in a given period. This decides when the dashboard's
+            companions consider you've done "enough" — a lighter pace celebrates sooner, a more
+            intense pace expects more before it does.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {(Object.keys(COMPANION_PACE_PRESETS) as CompanionPaceId[]).map((id) => {
+              const preset = COMPANION_PACE_PRESETS[id];
+              const active = companionPace.id === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => updateCompanionPace(id)}
+                  className={cn(
+                    "text-left rounded-xl border p-4 transition-all",
+                    active ? "border-indigo-500 bg-indigo-50/60 ring-1 ring-indigo-500" : "border-slate-200 hover:border-slate-300"
+                  )}
+                >
+                  <p className={cn("text-sm font-bold", active ? "text-indigo-700" : "text-slate-800")}>{preset.label}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{preset.description}</p>
+                  <p className="text-[10px] font-mono text-slate-400 mt-3">{preset.streakGoalDays}d streak · {preset.weeklyOutputGoalPct}% weekly</p>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

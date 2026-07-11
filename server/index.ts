@@ -1,13 +1,34 @@
 import 'dotenv/config';
 import express from 'express';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenAI } from '@google/genai';
+import { supabase } from '../lib/supabase';
 
 const app = express();
-app.use(express.json());
+app.use(helmet());
+app.use(express.json({ limit: '32kb' }));
 
 const anthropic = new Anthropic();
 const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+const chatLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
+
+async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authHeader = req.headers.authorization ?? '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data?.user) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  next();
+}
 
 const SYSTEM_PROMPT = `You are the AI Director inside TrueProgress, a productivity dashboard that tracks the user's projects, tasks, and weekly output. Give specific, actionable guidance grounded in what the user tells you about their work. Keep responses to a few sentences unless the user asks for more detail.
 
@@ -149,7 +170,7 @@ async function askGemini(messages: ChatMessage[], contextBlock: string): Promise
   return { reply: response.text ?? '', toolCalls };
 }
 
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', chatLimiter, requireAuth, async (req, res) => {
   const { messages, provider, context } = req.body ?? {};
   if (!Array.isArray(messages) || messages.length === 0) {
     res.status(400).json({ error: 'messages array is required' });

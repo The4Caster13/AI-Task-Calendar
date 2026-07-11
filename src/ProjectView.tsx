@@ -1,7 +1,10 @@
 import React, { useMemo } from 'react';
-import { 
-  CheckCircle2, 
-  Clock, 
+import {
+  DndContext, DragEndEvent, PointerSensor, useDraggable, useDroppable, useSensor, useSensors,
+} from '@dnd-kit/core';
+import {
+  CheckCircle2,
+  Clock,
   ArrowRight,
   SlidersHorizontal,
   Layers,
@@ -11,16 +14,44 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+type BoardColumnId = 'backlog' | 'active' | 'finished';
+
 interface ProjectViewProps {
   state: any;
+  setState: any;
   projectId: string;
 }
 
-const ProjectView = ({ state, projectId }: ProjectViewProps) => {
+const ProjectView = ({ state, setState, projectId }: ProjectViewProps) => {
   // Find the specific project from the global state
   const activeProject = useMemo(() => {
     return state.goals.find((g: any) => g.id === projectId);
   }, [state.goals, projectId]);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+
+  const moveTask = (taskId: string, column: BoardColumnId) => {
+    setState((prev: any) => ({
+      ...prev,
+      goals: prev.goals.map((g: any) => (
+        g.id !== projectId ? g : {
+          ...g,
+          tasks: g.tasks.map((t: any) => {
+            if (t.id !== taskId) return t;
+            if (column === 'finished') return { ...t, completed: true, isPriority: false, completedAt: t.completedAt ?? Date.now() };
+            if (column === 'active') return { ...t, completed: false, isPriority: true, completedAt: undefined };
+            return { ...t, completed: false, isPriority: false, completedAt: undefined };
+          }),
+        }
+      )),
+    }));
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+    moveTask(String(active.id), over.id as BoardColumnId);
+  };
 
   // If project doesn't exist, show error
   if (!activeProject) return <div className="p-20 text-center text-slate-400">Project not found</div>;
@@ -107,41 +138,43 @@ const ProjectView = ({ state, projectId }: ProjectViewProps) => {
             <button className="text-slate-300 hover:text-slate-500"><MoreHorizontal size={20}/></button>
           </div>
           
-          <div className="flex items-start justify-between gap-4 min-h-[400px]">
-            {/* To-Do Column */}
-            <div className="flex-1 bg-slate-50/50 rounded-2xl border border-slate-100 p-4 flex flex-col gap-3">
-              <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Backlog</h4>
-              {activeProject.tasks.filter((t: any) => !t.completed && !t.isPriority).map((t: any) => (
-                <div key={t.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-xs font-bold text-slate-600">
-                  {t.title}
-                </div>
-              ))}
+          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+            <div className="flex items-start justify-between gap-4 min-h-[400px]">
+              {/* To-Do Column */}
+              <BoardColumn id="backlog" className="flex-1 bg-slate-50/50 rounded-2xl border border-slate-100 p-4 flex flex-col gap-3">
+                <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Backlog</h4>
+                {activeProject.tasks.filter((t: any) => !t.completed && !t.isPriority).map((t: any) => (
+                  <DraggableTask key={t.id} id={t.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-xs font-bold text-slate-600">
+                    {t.title}
+                  </DraggableTask>
+                ))}
+              </BoardColumn>
+
+              <ArrowRight className="text-slate-200 mt-12" size={18} />
+
+              {/* Doing Column */}
+              <BoardColumn id="active" className="flex-1 bg-indigo-50/30 rounded-2xl border border-indigo-100 p-4 flex flex-col gap-3">
+                <h4 className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-2 px-1">Active</h4>
+                {activeProject.tasks.filter((t: any) => !t.completed && t.isPriority).map((t: any) => (
+                  <DraggableTask key={t.id} id={t.id} className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-indigo-500 text-xs font-black text-slate-800">
+                    {t.title}
+                  </DraggableTask>
+                ))}
+              </BoardColumn>
+
+              <ArrowRight className="text-slate-200 mt-12" size={18} />
+
+              {/* Done Column */}
+              <BoardColumn id="finished" className="flex-1 bg-emerald-50/30 rounded-2xl border border-emerald-100 p-4 flex flex-col gap-3">
+                <h4 className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mb-2 px-1">Finished</h4>
+                {activeProject.tasks.filter((t: any) => t.completed).map((t: any) => (
+                  <DraggableTask key={t.id} id={t.id} className="bg-white/60 p-4 rounded-xl border border-emerald-50 text-xs text-slate-400 line-through font-medium">
+                    {t.title}
+                  </DraggableTask>
+                ))}
+              </BoardColumn>
             </div>
-
-            <ArrowRight className="text-slate-200 mt-12" size={18} />
-
-            {/* Doing Column */}
-            <div className="flex-1 bg-indigo-50/30 rounded-2xl border border-indigo-100 p-4 flex flex-col gap-3">
-              <h4 className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-2 px-1">Active</h4>
-              {activeProject.tasks.filter((t: any) => !t.completed && t.isPriority).map((t: any) => (
-                <div key={t.id} className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-indigo-500 text-xs font-black text-slate-800">
-                  {t.title}
-                </div>
-              ))}
-            </div>
-
-            <ArrowRight className="text-slate-200 mt-12" size={18} />
-
-            {/* Done Column */}
-            <div className="flex-1 bg-emerald-50/30 rounded-2xl border border-emerald-100 p-4 flex flex-col gap-3">
-              <h4 className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mb-2 px-1">Finished</h4>
-              {activeProject.tasks.filter((t: any) => t.completed).map((t: any) => (
-                <div key={t.id} className="bg-white/60 p-4 rounded-xl border border-emerald-50 text-xs text-slate-400 line-through font-medium">
-                  {t.title}
-                </div>
-              ))}
-            </div>
-          </div>
+          </DndContext>
         </div>
 
         {/* Project Sidebar (Milestones & Resources) */}
@@ -170,6 +203,33 @@ const ProjectView = ({ state, projectId }: ProjectViewProps) => {
             </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+// Droppable Sprint Board column
+const BoardColumn = ({ id, className, children }: { id: BoardColumnId; className: string; children: React.ReactNode }) => {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef} className={cn(className, isOver && "ring-2 ring-indigo-300")}>
+      {children}
+    </div>
+  );
+};
+
+// Draggable Sprint Board task card
+const DraggableTask = ({ id, className, children }: { id: string; className: string; children: React.ReactNode }) => {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id });
+  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 10 } : undefined;
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={cn(className, isDragging ? "opacity-50 shadow-lg cursor-grabbing" : "cursor-grab")}
+    >
+      {children}
     </div>
   );
 };

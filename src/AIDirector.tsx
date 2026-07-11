@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Send, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 type AIProvider = "claude" | "gemini";
 interface AIMessage { id: string; role: "user" | "assistant"; content: string; provider?: AIProvider; }
@@ -100,6 +101,7 @@ export default function AIDirector({ state, setState }: { state: any; setState: 
           const taskTitle = String(call.input?.taskTitle ?? "").trim();
           const projectTitle = call.input?.projectTitle ? String(call.input.projectTitle).trim().toLowerCase() : null;
           if (!taskTitle) { notes.push("Couldn't remove a task without a title."); continue; }
+          if (!window.confirm(`Remove task "${taskTitle}"?`)) { notes.push(`Skipped removing "${taskTitle}" (not confirmed).`); continue; }
 
           let removed = false;
           nextGoals = nextGoals.map((g) => {
@@ -142,6 +144,7 @@ export default function AIDirector({ state, setState }: { state: any; setState: 
         if (call.name === "remove_project") {
           const projectTitle = String(call.input?.projectTitle ?? "").trim();
           if (!projectTitle) { notes.push("Couldn't remove a project without a title."); continue; }
+          if (!window.confirm(`Delete project "${projectTitle}" and all its tasks?`)) { notes.push(`Skipped deleting "${projectTitle}" (not confirmed).`); continue; }
 
           let idx = nextGoals.findIndex((g) => g.title?.toLowerCase() === projectTitle.toLowerCase());
           if (idx === -1) idx = nextGoals.findIndex((g) => g.title?.toLowerCase().includes(projectTitle.toLowerCase()));
@@ -175,9 +178,15 @@ export default function AIDirector({ state, setState }: { state: any; setState: 
     setSendingFlags((prev) => ({ ...prev, [activeProvider]: true }));
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
+
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({
           provider: activeProvider,
           messages: nextMessages.map(({ role, content }) => ({ role, content })),
