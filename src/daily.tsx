@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn, formatDueDate } from '@/lib/utils';
 import { getHolidayForDate } from '@/lib/holidays';
 import { getAllTasks, toggleTaskInState, deleteTaskFromState, addTaskToState } from '@/lib/tasks';
@@ -222,31 +223,33 @@ export default function DailyTasks({ state, setState }: { state: any, setState: 
                   onKeyDown={(e) => e.key === "Enter" && addTask()}
                   className="flex-1 min-w-[160px] rounded-lg h-10 border-border"
                 />
-                <select
-                  value={newProjectId}
-                  onChange={(e) => setNewProjectId(e.target.value)}
-                  className="bg-muted border border-border rounded-lg px-3 py-2 text-xs font-semibold outline-none"
-                >
-                  <option value="">No Project</option>
-                  {state.goals.map((g: any) => (
-                    <option key={g.id} value={g.id}>{g.title}</option>
-                  ))}
-                </select>
+                <Select value={newProjectId || "none"} onValueChange={(v) => setNewProjectId(v === "none" ? "" : (v as string))}>
+                  <SelectTrigger className="h-10 bg-muted border-border rounded-lg text-xs font-semibold">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Project</SelectItem>
+                    {state.goals.map((g: any) => (
+                      <SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <input
                   type="date"
                   value={newDueDate}
                   onChange={(e) => setNewDueDate(e.target.value)}
                   className="bg-muted border border-border rounded-lg px-3 py-2 text-xs font-semibold outline-none"
                 />
-                <select
-                  value={newPriority}
-                  onChange={(e) => setNewPriority(e.target.value as any)}
-                  className="bg-muted border border-border rounded-lg px-3 py-2 text-xs font-semibold outline-none"
-                >
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
+                <Select value={newPriority} onValueChange={(v) => setNewPriority(v as any)}>
+                  <SelectTrigger className="h-10 bg-muted border-border rounded-lg text-xs font-semibold">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button onClick={addTask} className="h-10 bg-primary hover:bg-primary/90 px-6">Add</Button>
               </div>
 
